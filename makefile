@@ -1,15 +1,21 @@
 CC := g++
 CFLAGS := -Wall -g --std=c++11 -lpthread
 
-OBJECTS := twebserv.o socklib.o
+OBJECTS := twebserv.o socklib.o handle.o common.o
+TARGET := twebserv
 
-twebserv: $(OBJECTS)
+
+$(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) -o twebserv $(OBJECTS)
-twebserv.o: twebserv.cpp
+twebserv.o: twebserv.cpp handle.h socklib.h
 	$(CC) $(CFLAGS) -c $<
-socklib.o: socklib.cpp
+socklib.o: socklib.cpp socklib.h
+	$(CC) $(CFLAGS) -c $<
+handle.o: handle.cpp handle.h common.h
+	$(CC) $(CFLAGS) -c $<
+common.o: common.cpp common.h handle.h
 	$(CC) $(CFLAGS) -c $<
 
 .PHONY:clean
 clean:
-	-rm -f twebserv *.o
+	-rm -f $(TARGET) *.o
