@@ -146,5 +146,7 @@ char *file_type(char *f) {
  * input absolute path, and change work space; 
  */
 void setdir(const char *abpath) {
-    
+    if(abpath == NULL) {
+        
+    }
 }

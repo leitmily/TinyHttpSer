@@ -1,13 +1,13 @@
 CC := g++
 CFLAGS := -Wall -g --std=c++11 -lpthread
 
-OBJECTS := twebserv.o socklib.o
+OBJECTS := tinwebserv.o ssocklib.o
 
 twebserv: $(OBJECTS)
 	$(CC) $(CFLAGS) -o twebserv $(OBJECTS)
-twebserv.o: twebserv.cpp
+tinwebserv.o: tinwebserv.cpp
 	$(CC) $(CFLAGS) -c $<
-socklib.o: socklib.cpp
+ssocklib.o: ssocklib.cpp
 	$(CC) $(CFLAGS) -c $<
 
 .PHONY:clean
