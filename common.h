@@ -46,3 +46,8 @@ bool not_exist(char *f);
     file_type(filename) returns the 'extension': cat uses it
 ------------------------------------------------------------------*/
 char *file_type(char *f);
+
+/*
+ * input absolute path, and change work space; 
+ */
+void setdir(const char *abpath);

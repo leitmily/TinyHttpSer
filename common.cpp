@@ -141,3 +141,10 @@ char *file_type(char *f) {
     if((cp = strrchr(f, '.')) != NULL) return cp + 1;
     return " -";
 }
+
+/*
+ * input absolute path, and change work space; 
+ */
+void setdir(const char *abpath) {
+    
+}
