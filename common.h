@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <stdio.h>
 
+
 /*
  * initialize the status variables and
  * set the thread attribute to detached 
@@ -25,7 +26,7 @@ void sanitize(char *str);
 /* handle built-in URLs here. Only one so far is “status" */
 int built_in(char *arg, int fd);
 
-int http_reply(int fd, FILE **fpp, int code, char *msg, char *type, char *content);
+int http_reply(int fd, FILE **fpp, int code, const char *msg, const char *type, const char *content);
 
 /*-----------------------------------------------------------------
     simple functions first:

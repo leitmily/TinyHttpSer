@@ -22,7 +22,7 @@
 #include <string.h>
 
 #define HOSTLEN 256
-#define BACKLOG 1
+#define BACKLOG 10
 
 int make_server_socket(int portnum) {
     return make_server_socket_q(portnum, BACKLOG);

@@ -19,7 +19,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <dirent.h>
-#include <signal.h>
 
 /* server facts here */
 time_t server_started;
@@ -85,16 +84,6 @@ void setup(pthread_attr_t *attrp) {
     time(&server_started);//初始化统计字数和连接时间
     server_requests = 0;
     server_bytes_sent = 0;
-
-    //屏蔽SIGPIPE信号
-    struct sigaction sa;
-    sa.sa_handler = SIG_IGN;//忽略信号
-    sa.sa_flags = SA_NODEFER;//
-    if(sigemptyset(&sa.sa_mask) == -1 || //初始化信号集为空
-        sigaction(SIGPIPE, &sa, 0) == -1) { //屏蔽SIGPIPE
-        perror("failed to ignore SIGPIPE");
-        exit(EXIT_FAILURE);
-    }
 
 }
 

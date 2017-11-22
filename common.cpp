@@ -3,10 +3,13 @@
 #include "handle.h"
 #include <sys/stat.h>
 #include <string.h>
+#include <signal.h>
+#include <unistd.h>
 
 extern time_t server_started;
 extern int server_bytes_sent;
 extern int server_requests;
+
 
 /*
  * initialize the status variables and
@@ -16,12 +19,32 @@ void setup(pthread_attr_t *attrp) {//设置独立线程，即线程结束后无�
     pthread_attr_init(attrp);
     pthread_attr_setdetachstate(attrp, PTHREAD_CREATE_DETACHED);
 
-    time(&server_started);
+    time(&server_started);//请求时间
     server_requests = 0;
     server_bytes_sent = 0;
+
+
+    //屏蔽SIGPIPE信号
+    struct sigaction sa;
+    sa.sa_handler = SIG_IGN;//忽略信号
+    sa.sa_flags = SA_NODEFER;//
+    if(sigemptyset(&sa.sa_mask) == -1 || //初始化信号集为空
+        sigaction(SIGPIPE, &sa, 0) == -1) { //屏蔽SIGPIPE
+        perror("failed to ignore SIGPIPE");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void *handle_call(void *fdptr) {
+    //在线程中阻塞SIGPIPE信号，让主线程处理该线程
+    sigset_t sgmask;
+    sigemptyset(&sgmask);
+    sigaddset(&sgmask, SIGPIPE);//添加要被阻塞的信号
+    int t = pthread_sigmask(SIG_BLOCK, &sgmask, NULL);
+    if(t != 0) {
+        printf("file: %s, line: %d, block sigpipe error\n", __FILE__, __LINE__);
+    }
+
     FILE *fpin;
     char request[BUFSIZ];
     int fd;
@@ -30,13 +53,17 @@ void *handle_call(void *fdptr) {
     free(fdptr);
 
     fpin = fdopen(fd, "r");
-    fgets(request, BUFSIZ, fpin);
+    printf("开始获取http请求行.\n");
+    fgets(request, BUFSIZ, fpin);//读取整行，遇到回车符结束
     printf("got a call on %d: request = %s", fd, request);
-    skip_rest_of_header(fpin);
+    skip_rest_of_header(fpin);//忽略请求头部
 
-    process_rq(request, fd);
-
+    
+    process_rq(request, fd);//处理请求
+    printf("请求处理完成。\n");
+    close(fd);
     fclose(fpin);
+    return NULL;
 }
 
 /*-----------------------------------------------------------------
@@ -58,19 +85,36 @@ void sanitize(char *str) {
 
     while(*src) {
         if(strncmp(src, "/../", 4) == 0) 
-            src +=3;
+            src += 3;
         else if(strncmp(src, "//", 2) == 0)
             src++;
+        else if(strncmp(src, "/./", 3) == 0)
+            src += 2;
         else
             *dest++ = *src++;
     }
     *dest = '\0';
-    if(*str == '/')
-        strcpy(str, str + 1);
+    // if(*str == '/')
+    //     strcpy(str, str + 1);
     
     if(str[0] == '\0' || strcmp(str, "./") == 0
         || strcmp(str, "./..") == 0)
-        strcpy(str, ".");
+        strcpy(str, "/");
+
+    //解码中文字符
+    src = dest = str;
+    for (; *dest != '\0'; ++dest) {
+        if (*dest == '%') {
+            int code;
+            if (sscanf(dest+1, "%x", &code) != 1) 
+                code = '?';
+            *src++ = code;
+            dest += 2;
+        }
+        else {
+            *src++ = *dest;
+        }
+    }
 }
     
 /* handle built-in URLs here. Only one so far is “status" */
@@ -88,7 +132,7 @@ int built_in(char *arg, int fd) {
     return 1;
 }
 
-int http_reply(int fd, FILE **fpp, int code, char *msg, char *type, char *content) {
+int http_reply(int fd, FILE **fpp, int code, const char *msg, const char *type, const char *content) {
     FILE *fp = fdopen(fd, "w");
     int bytes = 0;
     
@@ -139,7 +183,7 @@ bool not_exist(char *f) {
 char *file_type(char *f) {
     char *cp;
     if((cp = strrchr(f, '.')) != NULL) return cp + 1;
-    return " -";
+    return (char *)"/";
 }
 
 /*
@@ -147,6 +191,6 @@ char *file_type(char *f) {
  */
 void setdir(const char *abpath) {
     if(abpath == NULL) {
-        
+
     }
 }
