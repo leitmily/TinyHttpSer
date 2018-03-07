@@ -7,15 +7,17 @@
 *  build: cc twebser.cpp socklib.c -lpthread -o twebserv
 */
 
-#include "handle.h"
-#include "socklib.h"
-#include "common.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <string.h>
 #include <unistd.h>
+
+#include "handle.h"
+#include "socklib.h"
+#include "common.h"
+#include "./threadpool/cthreadpool.h"
 
 /* server facts here */
 time_t server_started;//请求时间
@@ -46,6 +48,7 @@ int main(int argc, char **argv) {
         示例: ./twebserv -p 8888 -d /home/\n");
         exit(1);
     }
+
     chdir(dir);
     int sock, fd;
     int *fdptr;
@@ -54,21 +57,26 @@ int main(int argc, char **argv) {
 
     void *handle_call(void *);
 
+    CThreadPool threadpool(5);
+    
+
     sock = make_server_socket(port);
     if(sock == -1) {
         perror("making socket");
         exit(2);
     }
 
-    setup(&attr);//置独立线程，即线程结束后无需调用pthread_join阻塞等待线程结束
-                 //忽略SIGPIPE信号
+    // setup(&attr);//置独立线程，即线程结束后无需调用pthread_join阻塞等待线程结束，忽略SIGPIPE信号
+
     /* main loop here: take call, handle call in new thread */
     while(true) {
         fd = accept(sock, NULL, NULL);
         server_requests++;
         fdptr = (int *)malloc(sizeof(int));
         *fdptr = fd;
-        pthread_create(&worker, &attr, handle_call, fdptr);
+        // pthread_create(&worker, &attr, handle_call, fdptr);
+        CMyTask *taskObj = new CMyTask(&handle_call, (void*)fdptr);
+        threadpool.AddTask(taskObj);
     }
     return 0;
 }
