@@ -40,11 +40,15 @@ int make_server_socket_q(int portnum, int backlog) {
     
     /* * build address and bind it to socket * */
     bzero((void *)&saddr, sizeof(saddr));                   /* clear out struct*/
-    gethostname(hostname, HOSTLEN);                         /* where am I */
-    hp = gethostbyname(hostname);                           /* get info about host*/
-                                                            /* fill in host part*/
-    bcopy((void *)hp->h_addr, (void *)&saddr.sin_addr, 
-            hp->h_length);
+
+    // gethostname(hostname, HOSTLEN);                         /* where am I */
+    // hp = gethostbyname(hostname);                           /* get info about host*/
+    //                                                         /* fill in host part*/
+    // bcopy((void *)hp->h_addr, (void *)&saddr.sin_addr, 
+    //         hp->h_length);
+    
+    saddr.sin_addr.s_addr = htonl(INADDR_ANY);
+
     saddr.sin_port = htons(portnum);                        /* fill in socket port */
     saddr.sin_family = AF_INET;                             /* fill in addr family */
     if(bind(sock_id, (struct sockaddr *)&saddr, 
