@@ -1,10 +1,11 @@
-#include "common.h"
 #include <stdlib.h>
-#include "handle.h"
 #include <sys/stat.h>
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+
+#include "common.h"
+#include "handle.h"
 
 extern time_t server_started;
 extern int server_bytes_sent;

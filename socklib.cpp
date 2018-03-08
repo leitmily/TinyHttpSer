@@ -30,8 +30,8 @@ int make_server_socket(int portnum) {
 
 int make_server_socket_q(int portnum, int backlog) {
     struct sockaddr_in saddr;                               /* build our address here */
-    struct hostent *hp;                                     /* this is part of our */
-    char hostname[HOSTLEN];                                 /* address */
+    // struct hostent *hp;                                     /* this is part of our */
+    // char hostname[HOSTLEN];                                 /* address */
     int sock_id;                                            /* the socket */
 
     sock_id = socket(PF_INET, SOCK_STREAM, 0);              /* get a socket */

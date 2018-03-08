@@ -4,6 +4,8 @@
         "fstream": "cpp",
         "complex": "cpp",
         "future": "cpp",
-        "system_error": "cpp"
+        "system_error": "cpp",
+        "*.tcc": "cpp",
+        "cstdlib": "cpp"
     }
 }
