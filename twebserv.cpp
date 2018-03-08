@@ -52,8 +52,8 @@ int main(int argc, char **argv) {
     chdir(dir);
     int sock, fd;
     int *fdptr;
-    pthread_t worker;
-    pthread_attr_t attr;
+    // pthread_t worker;
+    // pthread_attr_t attr;
 
     void *handle_call(void *);
 
