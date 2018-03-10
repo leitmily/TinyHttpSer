@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COMMON_H
+#define COMMON_H
 
 #include <pthread.h>
 #include <stdio.h>
@@ -57,3 +58,5 @@ char *file_type(char *f);
  * input absolute path, and change work space; 
  */
 void setdir(const char *abpath);
+
+#endif // COMMON_H
