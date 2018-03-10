@@ -73,10 +73,7 @@ void *handle_call(void *fdptr) {
 
 void skip_rest_of_header(FILE *fp) {
     char  buf[BUFSIZ] = "";
-    printf("head is: \n");
-    while(fgets(buf, BUFSIZ, fp) != NULL && strcmp(buf, "\r\n") != 0) {
-        printf("%s", buf);
-    }
+    while(fgets(buf, BUFSIZ, fp) != NULL && strcmp(buf, "\r\n") != 0);
 }
 
 /*-----------------------------------------------------------------
@@ -87,7 +84,6 @@ int read_content_length(FILE *fp) {
     char  buf[BUFSIZ] = "";
     while(fgets(buf, BUFSIZ, fp) != NULL && strcmp(buf, "\r\n") != 0) {
         char *arg = strchr(buf, ':');
-        printf("%s", buf);
         if (arg == NULL)
             continue;
         *arg = '\0';

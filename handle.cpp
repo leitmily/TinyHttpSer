@@ -152,13 +152,11 @@ void execute_cgi(int fd, FILE *fpin, const char *path, const char *method, const
     int cgi_input[2];
 
     pid_t pid;
-    int status, numchars = 1, content_length = 0;
+    int status, content_length = 0;
     
     if(strcmp(method, "POST") == 0) {
         content_length = read_content_length(fpin);
-        // recv(client, &c, 1, 0);
-        fgets(bufPost, BUFSIZ, fpin);
-        printf("bufPost is %s\n", bufPost);
+        fgets(bufPost, content_length + 1, fpin);
     }
 
 
@@ -227,8 +225,6 @@ void execute_cgi(int fd, FILE *fpin, const char *path, const char *method, const
         fflush(fpout);
 
         while (read(cgi_output[0], buf, 1) > 0) {
-            putchar(buf[0]);
-            fflush(stdout);
             send(fd, buf, 1, 0);
         }
 

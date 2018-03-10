@@ -51,10 +51,11 @@ ${BIN_TARGET}:${OBJ}
 	$(CC) $(CFLAGS) ${OBJ} -o $@ 
 
 #生成各个中间文件
-${DIR_OBJ}/%.o:${DIR_SRC_1}/%.cpp
-	$(CC) $(CFLAGS) -o $@ -c $<
 ${DIR_OBJ}/%.o:${DIR_SRC_2}/%.cpp
 	$(CC) $(CFLAGS) -o $@ -c $<
+${DIR_OBJ}/%.o:${DIR_SRC_1}/%.cpp
+	$(CC) $(CFLAGS) -o $@ -c $<
+
 
 .PHONY:clean
 clean:
