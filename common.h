@@ -18,6 +18,11 @@ void *handle_call(void *fdptr);
 ------------------------------------------------------------------*/
 void skip_rest_of_header(FILE *fp);
 
+/*-----------------------------------------------------------------
+    read content length in head at the post method.
+------------------------------------------------------------------*/
+int read_content_length(FILE *fp);
+
 /*
  * make sure all paths are below the current directory
  */

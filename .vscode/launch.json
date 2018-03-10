@@ -8,13 +8,14 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/twebserv",
-            "args": ["-p", "8888", "-d", "/home/tt/Desktop/"],
+            "program": "${workspaceFolder}/bin/twebserv",
+            "args": ["-p", "8889"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
             "externalConsole": true,
             "MIMode": "gdb",
+            "preLaunchTask": "make",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

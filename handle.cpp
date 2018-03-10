@@ -1,9 +1,13 @@
-#include "handle.h"
-#include "common.h"
+#include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/wait.h>
+
+#include "handle.h"
+#include "common.h"
 
 
 extern int server_bytes_sent;
@@ -15,29 +19,48 @@ extern int server_bytes_sent;
     rq is HTTP command: GET /foo.bar.teml HTTP/1.0
 ---------------------------------------------------->  //包含了Linux C 中的函数--------------*/
 
-void process_rq(char *rq, int fd) {
-    char cmd[BUFSIZ], arg[BUFSIZ], version[BUFSIZ], cpath[BUFSIZ];
+void process_rq(char *rq, int fd, FILE *fpin) {
+    char cmd[BUFSIZ], url[BUFSIZ], version[BUFSIZ], cpath[BUFSIZ], query_string[BUFSIZ] = "\0";
+    char path[BUFSIZ];
     
-    //strcpy(arg, ".");      /* precede args with ./ */
-    if(sscanf(rq, "%s %s %s", cmd, arg, version) != 3) return;
+    if(sscanf(rq, "%s %s %s", cmd, url, version) != 3) return;
+    strcpy(path, url);
 
-    sanitize(arg);//获得请求路径(请求路径)，和解码中文路径
+    char *arg = strchr(path, '?');
+    if (arg != NULL)
+    {
+        *arg = '\0';
+        strcpy(query_string, ++arg);
+    }
+    sanitize(path);//获得请求路径(请求路径)，和解码中文路径
     getcwd(cpath,BUFSIZ);//获得当前路径
-    strcat(cpath, arg);
-    //printf("file: %s, line: %d, sanitized version is %s\n", __FILE__, __LINE__, cpath);
-    //printf("file: %s, line: %d, atg is %s\n", __FILE__, __LINE__, arg);
-    if(strcmp(cmd, "GET") != 0)                          /* check command */
+    strcat(cpath, path); //完整路径
+
+    if(strcmp(cmd, "GET") == 0) {
+        skip_rest_of_header(fpin);//忽略请求头部
+        if(built_in(cpath, fd))
+        ;
+        else if (not_exist(cpath)) /* does the arg exist */
+            do_404(url, fd);       /* n: tell the user */
+        else if (isadir(cpath))    /* is it a directory? */
+            do_ls(url, fd);        /* y: list contents */
+        else {                     /* otherwise */
+            if(query_string[0] == '\0')
+                do_cat(cpath, fd);
+            else
+                execute_cgi(fd, fpin, cpath, cmd, query_string);
+        }
+    }
+    else if(strcmp(cmd, "POST") == 0) {
+        if(built_in(cpath, fd))
+        ;
+        else {
+            execute_cgi(fd, fpin, cpath, cmd, query_string);
+        }
+    }
+    else
         not_implemented(fd);
-    else if(built_in(cpath, fd))
-    ;
-    else if(not_exist(cpath))                             /* does the arg exist */
-        do_404(arg, fd);                                /* n: tell the user */
-    else if(isadir(cpath))                                /* is it a directory? */
-        do_ls(arg, fd);                                 /* y: list contents */
-    else                                                /* otherwise */
-        do_cat(cpath, fd);                                /* display contents */
-}
-    
+}   
 
     
 void do_404(char *item, int fd){
@@ -121,3 +144,98 @@ void do_cat(char *f, int fd) {
     }
     server_bytes_sent += bytes;
 }
+
+void execute_cgi(int fd, FILE *fpin, const char *path, const char *method, const char *query_string) {
+    char buf[BUFSIZ];
+    char bufPost[BUFSIZ];
+    int cgi_output[2];
+    int cgi_input[2];
+
+    pid_t pid;
+    int status, numchars = 1, content_length = 0;
+    
+    if(strcmp(method, "POST") == 0) {
+        content_length = read_content_length(fpin);
+        // recv(client, &c, 1, 0);
+        fgets(bufPost, BUFSIZ, fpin);
+        printf("bufPost is %s\n", bufPost);
+    }
+
+
+
+    /* 建立管道*/
+    if (pipe(cgi_output) < 0) {
+        /*错误处理*/
+        not_implemented(fd);
+        return;
+    }
+    /*建立管道*/
+    if (pipe(cgi_input) < 0) {
+        /*错误处理*/
+        not_implemented(fd);
+        return;
+    }
+
+
+    if ((pid = fork()) < 0 ) {
+        /*错误处理*/
+        not_implemented(fd);
+        return;
+    }
+
+    if(pid == 0) {// child process
+        fclose(fpin);
+        close(fd);
+        char meth_env[BUFSIZ];
+        char query_env[BUFSIZ];
+        char length_env[BUFSIZ];
+        /* 把 STDOUT 重定向到 cgi_output 的写入端 */
+        dup2(cgi_output[1], STDOUT_FILENO); //STDOUT_FILENO = 1
+        /* 把 STDIN 重定向到 cgi_input 的读取端 */
+        dup2(cgi_input[0], STDIN_FILENO); //STDIN_FILENO = 0
+        /* 关闭 cgi_input 的写入端 和 cgi_output 的读取端 */
+        close(cgi_output[0]);
+        close(cgi_input[1]);
+        /*设置 request_method 的环境变量*/
+        sprintf(meth_env, "REQUEST_METHOD=%s", method);
+        putenv(meth_env);
+        if (strcasecmp(method, "GET") == 0) {
+            /*设置 query_string 的环境变量*/
+            sprintf(query_env, "QUERY_STRING=%s", query_string);
+            putenv(query_env);
+        }
+        else {   /* POST */
+            /*设置 content_length 的环境变量*/
+            sprintf(length_env, "CONTENT_LENGTH=%d", content_length);
+            putenv(length_env);
+        }
+        execl(path, path, (char*)NULL);
+        exit(1);
+    }
+    else { // father process
+        /* 关闭 cgi_input 的读取端 和 cgi_output 的写入端 */
+        close(cgi_output[1]);
+        close(cgi_input[0]);
+
+        if (strcasecmp(method, "POST") == 0) {
+            /*把 POST 数据写入 cgi_input，现在重定向到 STDIN */
+            write(cgi_input[1], bufPost, content_length);
+        }
+
+        FILE *fpout = fdopen(fd, "w");
+        fprintf(fpout, "HTTP/1.0 200 OK\r\n");
+        fflush(fpout);
+
+        while (read(cgi_output[0], buf, 1) > 0) {
+            putchar(buf[0]);
+            fflush(stdout);
+            send(fd, buf, 1, 0);
+        }
+
+        /*关闭管道*/
+        close(cgi_output[0]);
+        close(cgi_input[1]);
+        /*等待子进程*/
+        waitpid(pid, &status, 0);
+    }
+}    
