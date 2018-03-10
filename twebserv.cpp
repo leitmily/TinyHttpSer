@@ -25,22 +25,22 @@ int server_bytes_sent;//发送字节总数
 int server_requests; //请求总次数
 
 int main(int argc, char **argv) {
-    if(argc < 5) {
+    if(argc < 3) {
         fprintf(stderr, "请指定端口号和工作路径！\n\
-        示例:\n./twebserv -p 8888 -d /home/\n");
+        示例:\n./twebserv -p 8888 [-d /home/] []参数可省略\n");
         exit(1);
     }
 
-    char *dir = NULL;
+    char dir[BUFSIZ] = "./htdocs";
     int port = -1;
     for(int i = 1; i < argc; i++) {
         if(strcmp(argv[i], "-p") == 0) {
             port = atoi(argv[++i]);
         }
         else if(strcmp(argv[i], "-d") ==0)
-            dir = argv[++i];
+            strcpy(dir, argv[++i]);
     }
-    if(port == -1 || dir == NULL) {
+    if(port == -1) {
         fprintf(stderr, "%d\n", port);
         fprintf(stderr, "%s\n", dir);
         fprintf(stderr, "输入参数不正确，请重新输入！\n");

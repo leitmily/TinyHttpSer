@@ -57,10 +57,9 @@ void *handle_call(void *fdptr) {
     printf("开始获取http请求行.\n");
     fgets(request, BUFSIZ, fpin);//读取整行，遇到回车符结束
     printf("got a call on %d: request = %s", fd, request);
-    skip_rest_of_header(fpin);//忽略请求头部
+    //skip_rest_of_header(fpin);//忽略请求头部
 
-    
-    process_rq(request, fd);//处理请求
+    process_rq(request, fd, fpin);//处理请求
     printf("请求处理完成。\n");
     close(fd);
     fclose(fpin);
@@ -75,6 +74,23 @@ void *handle_call(void *fdptr) {
 void skip_rest_of_header(FILE *fp) {
     char  buf[BUFSIZ] = "";
     while(fgets(buf, BUFSIZ, fp) != NULL && strcmp(buf, "\r\n") != 0);
+}
+
+/*-----------------------------------------------------------------
+    read content length in head at the post method.
+------------------------------------------------------------------*/
+int read_content_length(FILE *fp) {
+    int length = 0;
+    char  buf[BUFSIZ] = "";
+    while(fgets(buf, BUFSIZ, fp) != NULL && strcmp(buf, "\r\n") != 0) {
+        char *arg = strchr(buf, ':');
+        if (arg == NULL)
+            continue;
+        *arg = '\0';
+        if(strcasecmp(buf, "Content-Length") == 0)
+            length = atoi(++arg);
+    }
+    return length;
 }
 
 /*

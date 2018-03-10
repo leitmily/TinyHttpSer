@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COMMON_H
+#define COMMON_H
 
 #include <pthread.h>
 #include <stdio.h>
@@ -17,6 +18,11 @@ void *handle_call(void *fdptr);
     skip over all request info until a CCRNL is seen
 ------------------------------------------------------------------*/
 void skip_rest_of_header(FILE *fp);
+
+/*-----------------------------------------------------------------
+    read content length in head at the post method.
+------------------------------------------------------------------*/
+int read_content_length(FILE *fp);
 
 /*
  * make sure all paths are below the current directory
@@ -52,3 +58,5 @@ char *file_type(char *f);
  * input absolute path, and change work space; 
  */
 void setdir(const char *abpath);
+
+#endif // COMMON_H
