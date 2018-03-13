@@ -3,6 +3,8 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/socket.h>
 
 #include "common.h"
 #include "handle.h"
@@ -34,36 +36,6 @@ void setup(pthread_attr_t *attrp) {//设置独立线程，即线程结束后无�
         perror("failed to ignore SIGPIPE");
         exit(EXIT_FAILURE);
     }
-}
-
-void *handle_call(void *fdptr) {
-    //在线程中阻塞SIGPIPE信号，让主线程处理该线程
-    sigset_t sgmask;
-    sigemptyset(&sgmask);
-    sigaddset(&sgmask, SIGPIPE);//添加要被阻塞的信号
-    int t = pthread_sigmask(SIG_BLOCK, &sgmask, NULL);
-    if(t != 0) {
-        printf("file: %s, line: %d, block sigpipe error\n", __FILE__, __LINE__);
-    }
-
-    FILE *fpin;
-    char request[BUFSIZ];
-    int fd;
-
-    fd = *(int *)fdptr;
-    free(fdptr);
-
-    fpin = fdopen(fd, "r");
-    printf("开始获取http请求行.\n");
-    fgets(request, BUFSIZ, fpin);//读取整行，遇到回车符结束
-    printf("got a call on %d: request = %s", fd, request);
-    //skip_rest_of_header(fpin);//忽略请求头部
-
-    process_rq(request, fd, fpin);//处理请求
-    printf("请求处理完成。\n");
-    close(fd);
-    fclose(fpin);
-    return NULL;
 }
 
 /*-----------------------------------------------------------------
@@ -209,5 +181,18 @@ char *file_type(char *f) {
 void setdir(const char *abpath) {
     if(abpath == NULL) {
 
+    }
+}
+
+void setNonBlock(int fd) {
+    int opts = fcntl(fd, F_GETFL);
+    if(opts < 0) {
+        perror("fcntl(sock,GETFL)");
+        return;
+    }
+    opts = opts | O_NONBLOCK;
+    if(fcntl(fd, F_SETFL, opts) < 0) {
+        perror("fcntl(sock,GETFL)");
+        return;
     }
 }

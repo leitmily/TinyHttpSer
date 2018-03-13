@@ -1,5 +1,5 @@
 #include "condvar.h"
-#include "errexit.h"
+#include "../errexit.h"
 
 #include <iostream>
 using namespace std;

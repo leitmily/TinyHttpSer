@@ -5,12 +5,19 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
+#include <map>
+#include <pthread.h>
 
 #include "handle.h"
 #include "common.h"
+#include "./threadpool/mutex.h"
+#include "./myepoll/cepoll.h"
 
 
 extern int server_bytes_sent;
+extern Mutex mapmux;
+extern std::map<int, user_data> um;
+extern Epoll myepoll;
 
 /*-----------------------------------------------------------------
     process_rq(char *rq, int fd)
@@ -18,10 +25,74 @@ extern int server_bytes_sent;
     hadnles request in a new process
     rq is HTTP command: GET /foo.bar.teml HTTP/1.0
 ---------------------------------------------------->  //包含了Linux C 中的函数--------------*/
+void *handle_call(void *fdptr) {
+    //在线程中阻塞SIGPIPE信号，让主线程处理该线程
+    sigset_t sgmask;
+    sigemptyset(&sgmask);
+    sigaddset(&sgmask, SIGPIPE);//添加要被阻塞的信号
+    int t = pthread_sigmask(SIG_BLOCK, &sgmask, NULL);
+    if(t != 0) {
+        printf("file: %s, line: %d, block sigpipe error\n", __FILE__, __LINE__);
+    }
+    pthread_t tid = pthread_self();
+    printf("this is handle_call. tid is %lu\n", tid);
+    fflush(stdout);
+    FILE *fpin;
+    char request[BUFSIZ];
+    int fd = *(int *)fdptr;
+    free(fdptr);
+
+    mapmux.lock();
+    int count = um.count(fd);
+    if(count != 0) {
+        mapmux.unlock();
+        return NULL;
+    }
+    else {
+        um[fd];
+    }
+    mapmux.unlock();
+
+    while(recv(fd, request, 1, MSG_PEEK | MSG_DONTWAIT) <= 0) {
+        printf("nonononononononononono message  tid is %lu\n", tid);
+        mapmux.lock();
+        um.erase(fd);
+        mapmux.unlock();
+        close(fd);
+        return NULL;
+    }
+    
+    
+
+    fpin = fdopen(fd, "r");
+    printf("开始获取http请求行 fd is %d. tid is %lu\n", fd, tid);
+    fflush(stdout);
+    // while(recv(fd, request, 1, 0) > 0) {
+    //     printf("%s", request);
+    // }
+    fgets(request, BUFSIZ, fpin);//读取整行，遇到回车符结束
+    if(request[0] == '\0') {
+        printf("request error.tid is %lu\n", tid);
+        mapmux.lock();
+        um.erase(fd);
+        mapmux.unlock();
+        close(fd);
+        return NULL;
+    }
+    printf("got a call on %d: request = %s  tid is %lu\n", fd, request, (tid));
+    fflush(stdout);
+    // skip_rest_of_header(fpin);//忽略请求头部
+
+    process_rq(request, fd, fpin);//处理请求
+    printf("请求处理完成。tid is %lu\n", (tid));
+    fflush(stdout);
+    return NULL;
+}
 
 void process_rq(char *rq, int fd, FILE *fpin) {
     char cmd[BUFSIZ], url[BUFSIZ], version[BUFSIZ], cpath[BUFSIZ], query_string[BUFSIZ] = "\0";
-    char path[BUFSIZ];
+    char path[BUFSIZ], bufPost[BUFSIZ];
+    struct user_data ud;
     
     if(sscanf(rq, "%s %s %s", cmd, url, version) != 3) return;
     strcpy(path, url);
@@ -36,31 +107,86 @@ void process_rq(char *rq, int fd, FILE *fpin) {
     getcwd(cpath,BUFSIZ);//获得当前路径
     strcat(cpath, path); //完整路径
 
+    strcpy(ud.method, cmd);
+    strcpy(ud.cpath, cpath);
+    strcpy(ud.url, url);
+
     if(strcmp(cmd, "GET") == 0) {
         skip_rest_of_header(fpin);//忽略请求头部
-        if(built_in(cpath, fd))
-        ;
-        else if (not_exist(cpath)) /* does the arg exist */
-            do_404(url, fd);       /* n: tell the user */
-        else if (isadir(cpath))    /* is it a directory? */
-            do_ls(url, fd);        /* y: list contents */
-        else {                     /* otherwise */
-            if(query_string[0] == '\0')
-                do_cat(cpath, fd);
-            else
-                execute_cgi(fd, fpin, cpath, cmd, query_string);
-        }
+        strcpy(ud.c_arg.query_string, query_string);
     }
     else if(strcmp(cmd, "POST") == 0) {
-        if(built_in(cpath, fd))
+        int content_length = read_content_length(fpin);
+        fgets(bufPost, content_length + 1, fpin);
+        ud.c_arg.p_arg.content_length = content_length;
+        strcpy(ud.c_arg.p_arg.pstring, bufPost);
+    }
+
+    mapmux.lock();
+    um[fd] = ud;
+    mapmux.unlock();
+    myepoll.ModEvent(fd, Epoll::ETOUT);
+    return;
+}   
+
+void *process_rp(void *fdptr) {
+    //在线程中阻塞SIGPIPE信号，让主线程处理该线程
+    sigset_t sgmask;
+    sigemptyset(&sgmask);
+    sigaddset(&sgmask, SIGPIPE);//添加要被阻塞的信号
+    int t = pthread_sigmask(SIG_BLOCK, &sgmask, NULL);
+    if(t != 0) {
+        printf("file: %s, line: %d, block sigpipe error\n", __FILE__, __LINE__);
+    }
+    pthread_t tid = pthread_self();
+    printf("this is process_rp.tid is %lu\n", tid);
+
+    int fd = *(int *)fdptr;
+    free(fdptr);
+
+    struct user_data ud;
+    int count;
+    mapmux.lock();
+    count = um.count(fd);
+    if(count != 0) {
+        ud = um[fd];
+    }
+    mapmux.unlock();
+    if(count == 0) {
+        close(fd);
+        return NULL;
+    }
+
+    if(strcmp(ud.method, "GET") == 0) {
+        if(built_in(ud.cpath, fd))
+        ;
+        else if (not_exist(ud.cpath)) /* does the arg exist */
+            do_404(ud.url, fd);       /* n: tell the user */
+        else if (isadir(ud.cpath))    /* is it a directory? */
+            do_ls(ud.url, fd);        /* y: list contents */
+        else {                     /* otherwise */
+            if(ud.c_arg.query_string[0] == '\0')
+                do_cat(ud.cpath, fd);
+            else
+                execute_cgi(fd, &ud);
+        }
+    }
+    else if(strcmp(ud.method, "POST") == 0) {
+        if(built_in(ud.cpath, fd))
         ;
         else {
-            execute_cgi(fd, fpin, cpath, cmd, query_string);
+            execute_cgi(fd, &ud);
         }
     }
     else
         not_implemented(fd);
-}   
+
+    mapmux.lock();
+    um.erase(fd);
+    mapmux.unlock();
+    close(fd);
+    return NULL;
+}
 
     
 void do_404(char *item, int fd){
@@ -145,21 +271,13 @@ void do_cat(char *f, int fd) {
     server_bytes_sent += bytes;
 }
 
-void execute_cgi(int fd, FILE *fpin, const char *path, const char *method, const char *query_string) {
+void execute_cgi(int fd, struct user_data *ud) {
     char buf[BUFSIZ];
-    char bufPost[BUFSIZ];
     int cgi_output[2];
     int cgi_input[2];
 
     pid_t pid;
-    int status, content_length = 0;
-    
-    if(strcmp(method, "POST") == 0) {
-        content_length = read_content_length(fpin);
-        fgets(bufPost, content_length + 1, fpin);
-    }
-
-
+    int status;
 
     /* 建立管道*/
     if (pipe(cgi_output) < 0) {
@@ -182,7 +300,6 @@ void execute_cgi(int fd, FILE *fpin, const char *path, const char *method, const
     }
 
     if(pid == 0) {// child process
-        fclose(fpin);
         close(fd);
         char meth_env[BUFSIZ];
         char query_env[BUFSIZ];
@@ -195,19 +312,19 @@ void execute_cgi(int fd, FILE *fpin, const char *path, const char *method, const
         close(cgi_output[0]);
         close(cgi_input[1]);
         /*设置 request_method 的环境变量*/
-        sprintf(meth_env, "REQUEST_METHOD=%s", method);
+        sprintf(meth_env, "REQUEST_METHOD=%s", ud->method);
         putenv(meth_env);
-        if (strcasecmp(method, "GET") == 0) {
+        if (strcasecmp(ud->method, "GET") == 0) {
             /*设置 query_string 的环境变量*/
-            sprintf(query_env, "QUERY_STRING=%s", query_string);
+            sprintf(query_env, "QUERY_STRING=%s", ud->c_arg.query_string);
             putenv(query_env);
         }
         else {   /* POST */
             /*设置 content_length 的环境变量*/
-            sprintf(length_env, "CONTENT_LENGTH=%d", content_length);
+            sprintf(length_env, "CONTENT_LENGTH=%d", ud->c_arg.p_arg.content_length);
             putenv(length_env);
         }
-        execl(path, path, (char*)NULL);
+        execl(ud->cpath, ud->cpath, (char*)NULL);
         exit(1);
     }
     else { // father process
@@ -215,9 +332,9 @@ void execute_cgi(int fd, FILE *fpin, const char *path, const char *method, const
         close(cgi_output[1]);
         close(cgi_input[0]);
 
-        if (strcasecmp(method, "POST") == 0) {
+        if (strcasecmp(ud->method, "POST") == 0) {
             /*把 POST 数据写入 cgi_input，现在重定向到 STDIN */
-            write(cgi_input[1], bufPost, content_length);
+            write(cgi_input[1], ud->c_arg.p_arg.pstring, ud->c_arg.p_arg.content_length);
         }
 
         FILE *fpout = fdopen(fd, "w");
