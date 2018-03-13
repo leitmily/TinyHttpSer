@@ -13,16 +13,25 @@
 #include <sys/socket.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/epoll.h>
+#include <map>
 
 #include "handle.h"
 #include "socklib.h"
 #include "common.h"
 #include "./threadpool/cthreadpool.h"
+#include "./threadpool/mutex.h"
+#include "./myepoll/cepoll.h"
 
 /* server facts here */
 time_t server_started;//请求时间
 int server_bytes_sent;//发送字节总数
 int server_requests; //请求总次数
+
+std::map<int, user_data> um;
+int nfds;
+Mutex mapmux; //给map加锁
+Epoll myepoll(30, 10);
 
 int main(int argc, char **argv) {
     if(argc < 3) {
@@ -51,14 +60,8 @@ int main(int argc, char **argv) {
 
     chdir(dir);
     int sock, fd;
-    int *fdptr;
     // pthread_t worker;
     // pthread_attr_t attr;
-
-    void *handle_call(void *);
-
-    CThreadPool threadpool(5);
-    
 
     sock = make_server_socket(port);
     if(sock == -1) {
@@ -66,17 +69,56 @@ int main(int argc, char **argv) {
         exit(2);
     }
 
+    CThreadPool threadpool(30);
+
     // setup(&attr);//置独立线程，即线程结束后无需调用pthread_join阻塞等待线程结束，忽略SIGPIPE信号
 
-    /* main loop here: take call, handle call in new thread */
+    // /* main loop here: take call, handle call in new thread */
+    // while(true) {
+    //     fd = accept(sock, NULL, NULL);
+    //     server_requests++;
+    //     fdptr = (int *)malloc(sizeof(int));
+    //     *fdptr = fd;
+    //     // pthread_create(&worker, &attr, handle_call, fdptr);
+    //     CMyTask *taskObj = new CMyTask(&handle_call, (void*)fdptr);
+    //     threadpool.AddTask(taskObj);
+    // }
+
+    // int epfd = epoll_create(30);
+    // struct epoll_event ev, events[10];
+    // ev.data.fd = sock;
+    // ev.events = EPOLLIN | EPOLLET;
+    // epoll_ctl(epfd, EPOLL_CTL_ADD, sock, &ev);
+    myepoll.AddETIN(sock);
+
     while(true) {
-        fd = accept(sock, NULL, NULL);
-        server_requests++;
-        fdptr = (int *)malloc(sizeof(int));
-        *fdptr = fd;
-        // pthread_create(&worker, &attr, handle_call, fdptr);
-        CMyTask *taskObj = new CMyTask(&handle_call, (void*)fdptr);
-        threadpool.AddTask(taskObj);
+        // nfds = epoll_wait(epfd, events, 10, -1);
+        nfds = myepoll.WaitEvent(-1);
+        for(int i = 0; i < nfds; i++) {
+            if(myepoll.GetEventFd(i) == sock) {
+                fd = accept(sock, NULL, NULL);
+                if(fd < 0)
+                    continue;
+                myepoll.AddETIN(fd);
+            }
+            else if(myepoll.isReadAvailable(i)) {
+                int *fdptr = (int *)malloc(sizeof(int));
+                *fdptr = fd;
+                CMyTask *taskObj = new CMyTask(&handle_call, (void *)fdptr);
+                threadpool.AddTask(taskObj);
+            }
+            else if(myepoll.isWriteAvailable(i)) {
+                int *fdptr = (int *)malloc(sizeof(int));
+                *fdptr = fd;
+                CMyTask *taskObj = new CMyTask(&process_rp, (void *)fdptr);
+                threadpool.AddTask(taskObj);
+            }
+            else {
+                printf("error\n");
+                exit(1);
+            }
+        }
     }
+
     return 0;
 }

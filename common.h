@@ -4,14 +4,25 @@
 #include <pthread.h>
 #include <stdio.h>
 
+union cgi_arg {
+    char query_string[BUFSIZ];
+    struct p_arg {
+        int content_length;
+        char pstring[BUFSIZ];
+    }p_arg;
+};
+struct user_data {
+    char method[5];
+    char cpath[255];
+    char url[255];
+    cgi_arg c_arg;
+};
 
 /*
  * initialize the status variables and
  * set the thread attribute to detached 
  */
 void setup(pthread_attr_t *attrp);
-
-void *handle_call(void *fdptr);
 
 /*-----------------------------------------------------------------
     skip_rest_of_header(FILE *)
@@ -58,5 +69,7 @@ char *file_type(char *f);
  * input absolute path, and change work space; 
  */
 void setdir(const char *abpath);
+
+void setNonBlock(int fd);
 
 #endif // COMMON_H

@@ -13,6 +13,7 @@
  */
 
 #include "socklib.h"
+#include "common.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -55,6 +56,8 @@ int make_server_socket_q(int portnum, int backlog) {
         sizeof(saddr)) != 0)
         return -1;
     
+    setNonBlock(sock_id);
+
     /* * arrange for incoming calls * */
     if(listen(sock_id, backlog) != 0)
         return -1;

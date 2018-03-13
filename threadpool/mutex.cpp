@@ -1,5 +1,5 @@
 #include "mutex.h"
-#include "errexit.h"
+#include "../errexit.h"
 
 using namespace std;
 

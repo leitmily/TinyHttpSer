@@ -33,10 +33,11 @@
 DIR_BIN = ./bin
 DIR_SRC_1 = ./
 DIR_SRC_2 = ./threadpool
+DIR_SRC_3 = ./myepoll
 DIR_OBJ = ./obj
 
 #提前所有源文件(即：*.c文件)和所有中间文件(即：*.o)
-SRC = $(wildcard ${DIR_SRC_1}/*.cpp ${DIR_SRC_2}/*.cpp)
+SRC = $(wildcard ${DIR_SRC_1}/*.cpp ${DIR_SRC_2}/*.cpp ${DIR_SRC_3}/*.cpp)
 OBJ = $(patsubst %.cpp, ${DIR_OBJ}/%.o, $(notdir ${SRC}))
 INC = $(wildcard ${DIR_SRC_1}/*.h ${DIR_SRC_2}/*.h)
 #设置最后目标文件
@@ -51,6 +52,8 @@ ${BIN_TARGET}:${OBJ}
 	$(CC) $(CFLAGS) ${OBJ} -o $@ 
 
 #生成各个中间文件
+${DIR_OBJ}/%.o:${DIR_SRC_3}/%.cpp
+	$(CC) $(CFLAGS) -o $@ -c $<
 ${DIR_OBJ}/%.o:${DIR_SRC_2}/%.cpp
 	$(CC) $(CFLAGS) -o $@ -c $<
 ${DIR_OBJ}/%.o:${DIR_SRC_1}/%.cpp
