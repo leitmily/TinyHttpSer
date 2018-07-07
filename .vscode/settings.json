@@ -7,6 +7,8 @@
         "system_error": "cpp",
         "*.tcc": "cpp",
         "cstdlib": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "unordered_map": "cpp",
+        "map": "cpp"
     }
 }
