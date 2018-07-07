@@ -135,7 +135,7 @@ int http_reply(int fd, FILE **fpp, int code, const char *msg, const char *type, 
     if(fpp)
         *fpp = fp;
     else
-        fclose(fp);
+        close(fd);
     return bytes;
 }
 

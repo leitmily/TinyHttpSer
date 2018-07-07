@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
-#include <map>
+#include <unordered_map>
 #include <pthread.h>
 
 #include "handle.h"
@@ -16,7 +16,7 @@
 
 extern int server_bytes_sent;
 extern Mutex mapmux;
-extern std::map<int, user_data> um;
+extern std::unordered_map<int, user_data> um;
 extern Epoll myepoll;
 
 /*-----------------------------------------------------------------
@@ -27,13 +27,13 @@ extern Epoll myepoll;
 ---------------------------------------------------->  //包含了Linux C 中的函数--------------*/
 void *handle_call(void *fdptr) {
     //在线程中阻塞SIGPIPE信号，让主线程处理该线程
-    sigset_t sgmask;
-    sigemptyset(&sgmask);
-    sigaddset(&sgmask, SIGPIPE);//添加要被阻塞的信号
-    int t = pthread_sigmask(SIG_BLOCK, &sgmask, NULL);
-    if(t != 0) {
-        printf("file: %s, line: %d, block sigpipe error\n", __FILE__, __LINE__);
-    }
+    // sigset_t sgmask;
+    // sigemptyset(&sgmask);
+    // sigaddset(&sgmask, SIGPIPE);//添加要被阻塞的信号
+    // int t = pthread_sigmask(SIG_BLOCK, &sgmask, NULL);
+    // if(t != 0) {
+    //     printf("file: %s, line: %d, block sigpipe error\n", __FILE__, __LINE__);
+    // }
     pthread_t tid = pthread_self();
     printf("this is handle_call. tid is %lu\n", tid);
     fflush(stdout);
@@ -208,6 +208,10 @@ void do_ls(char *dir, int fd) {
     int bytes = 0;
 
     bytes = http_reply(fd, &fp, 200, "OK", "text/html", NULL);
+    if(fp == NULL) {
+        close(fd);
+        return ;
+    }
     bytes += fprintf(fp, "<HTML><TITLE>%s</TITLE>\r\n<BODY>", dir);
     //bytes += fprintf(fp, "Listing of Directory %s\n", dir);
     if((dirptr = opendir(cpath)) != NULL) {

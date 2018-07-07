@@ -14,7 +14,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/epoll.h>
-#include <map>
+#include <unordered_map>
+#include <signal.h>
 
 #include "handle.h"
 #include "socklib.h"
@@ -28,12 +29,13 @@ time_t server_started;//请求时间
 int server_bytes_sent;//发送字节总数
 int server_requests; //请求总次数
 
-std::map<int, user_data> um;
+std::unordered_map<int, user_data> um;
 int nfds;
 Mutex mapmux; //给map加锁
 Epoll myepoll(30, 10);
 
 int main(int argc, char **argv) {
+    signal(SIGPIPE, SIG_IGN);
     if(argc < 3) {
         fprintf(stderr, "请指定端口号和工作路径！\n\
         示例:\n./twebserv -p 8888 [-d /home/] []参数可省略\n");
